@@ -15,6 +15,10 @@ _attrs = {
         values = ["docker", "tar", "host"],
         doc = "See https://github.com/GoogleContainerTools/container-structure-test#running-file-tests-without-docker",
     ),
+    "platform": attr.string(
+        default = "linux/amd64",
+        doc = "Set platform if host is multi-platform capable (default \"linux/amd64\")",
+    ),
     "_runfiles": attr.label(default = "@bazel_tools//tools/bash/runfiles"),
     "_windows_constraint": attr.label(default = "@platforms//os:windows"),
 }
@@ -33,7 +37,7 @@ readonly image=$(rlocation {image_path})
 # When the image points to a folder, we can read the index.json file inside
 if [[ -d "$image" ]]; then
   readonly DIGEST=$("$jq" -r '.manifests[0].digest | sub(":"; "-")' "$image/index.json")
-  exec "$st" test --driver {driver} {fixed_args} --default-image-tag "registry.structure_test.oci.local/image:$DIGEST" $@
+  exec "$st" test --driver {driver} {fixed_args} --default-image-tag "cst.oci.local/$DIGEST:$DIGEST" $@
 else
   exec "$st" test --driver {driver} {fixed_args} $@
 fi
@@ -53,11 +57,13 @@ def _structure_test_impl(ctx):
         # https://github.com/GoogleContainerTools/container-structure-test/blob/5e347b66fcd06325e3caac75ef7dc999f1a9b614/cmd/container-structure-test/app/cmd/test.go#L110
         if ctx.attr.driver != "docker":
             fail("when the 'driver' attribute is not 'docker', then the image must be a .tar file")
-        fixed_args.extend(["--image-from-oci-layout", "$(rlocation %s)" % image_path])
-        fixed_args.extend(["--default-image-tag", "registry.structure_test.oci.local/image:$DIGEST"])
+        fixed_args.extend(["--ignore-ref-annotation", "--image-from-oci-layout", "$(rlocation %s)" % image_path])
 
     for arg in ctx.files.configs:
         fixed_args.extend(["--config", "$(rlocation %s)" % to_rlocation_path(ctx, arg)])
+
+    if ctx.attr.platform:
+        fixed_args.extend(["--platform", ctx.attr.platform])
 
     bash_launcher = ctx.actions.declare_file("%s.sh" % ctx.label.name)
     ctx.actions.write(

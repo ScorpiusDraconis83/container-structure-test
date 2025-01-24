@@ -19,6 +19,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+
 	"github.com/GoogleContainerTools/container-structure-test/cmd/container-structure-test/app/cmd/test"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -136,7 +137,7 @@ func run(out io.Writer) error {
 		var tag name.Tag
 
 		ref := desc.Annotations[v1.AnnotationRefName]
-		if ref != "" {
+		if ref != "" && !opts.IgnoreRefAnnotation {
 			tag, err = name.NewTag(ref)
 			if err != nil {
 				logrus.Fatalf("could not parse ref annotation %s: %v", v1.AnnotationRefName, err)
@@ -150,8 +151,17 @@ func run(out io.Writer) error {
 				logrus.Fatalf("could parse the default image tag %s: %v", opts.DefaultImageTag, err)
 			}
 		}
-		if _, err = daemon.Write(tag, img); err != nil {
+		var r string
+		if r, err = daemon.Write(tag, img); err != nil {
 			logrus.Fatalf("error loading oci layout into daemon: %v, %s", err)
+		}
+		// For some reason, daemon.Write doesn't return errors for some edge cases.
+		// We should always print what the daemon sent back so that errors are transparent.
+		fmt.Println("Loaded ", tag.String(), r)
+
+		_, err = daemon.Image(tag)
+		if err != nil {
+			logrus.Fatalf("error loading oci layout into daemon: %v", err)
 		}
 
 		opts.ImagePath = tag.String()
@@ -221,6 +231,7 @@ func AddTestFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&opts.ImagePath, "image", "i", "", "path to test image")
 	cmd.Flags().StringVar(&opts.ImageFromLayout, "image-from-oci-layout", "", "path to the oci layout to test against")
 	cmd.Flags().StringVar(&opts.DefaultImageTag, "default-image-tag", "", "default image tag to used when loading images to the daemon. required when --image-from-oci-layout refers to a oci layout lacking the reference annotation.")
+	cmd.Flags().BoolVar(&opts.IgnoreRefAnnotation, "ignore-ref-annotation", false, "ignore the org.opencontainers.image.ref.name and use --default-image-tag when loading to daemon")
 	cmd.MarkFlagsMutuallyExclusive("image", "image-from-oci-layout")
 	cmd.Flags().StringVarP(&opts.Driver, "driver", "d", "docker", "driver to use when running tests")
 	cmd.Flags().StringVar(&opts.Metadata, "metadata", "", "path to image metadata file")

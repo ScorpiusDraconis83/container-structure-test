@@ -14,7 +14,7 @@
 
 # Bump these on release
 VERSION_MAJOR ?= 1
-VERSION_MINOR ?= 16
+VERSION_MINOR ?= 19
 VERSION_BUILD ?= 0
 
 VERSION ?= v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
@@ -34,7 +34,11 @@ VERSION_PACKAGE := $(REPOPATH)/pkg/version
 ifeq ($(GOARCH), amd64)
 SUPPORTED_PLATFORMS := linux-$(GOARCH) darwin-$(GOARCH) windows-$(GOARCH).exe
 else
+ifeq ($(GOARCH), arm64)
+SUPPORTED_PLATFORMS := linux-$(GOARCH) darwin-$(GOARCH)
+else
 SUPPORTED_PLATFORMS := linux-$(GOARCH)
+endif
 endif
 
 GO_LDFLAGS :="
